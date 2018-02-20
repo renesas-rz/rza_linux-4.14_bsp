@@ -1,0 +1,5 @@
+$ watchdog -F -T 10 /dev/watchdog
+
+ (then Ctrl+c)
+
+
