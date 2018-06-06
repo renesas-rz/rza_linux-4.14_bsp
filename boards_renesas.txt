@@ -3,7 +3,7 @@
 # If you wish to support for a new board please edit boards_custom.txt
 #
 
-RENESAS_BOARDS="rskrza1 "
+RENESAS_BOARDS="rskrza1 streamit"
 
 # rskrza1
    BRD_DESC_rskrza1="RSK (RZ/A1H)"
@@ -13,4 +13,13 @@ RENESAS_BOARDS="rskrza1 "
  BRD_KERNEL_rskrza1=0x18200000
  BRD_ROOTFS_rskrza1=0x18800000
    BRD_QSPI_rskrza1=DUAL
+
+# streamit
+   BRD_DESC_streamit="Stream it! (RZ/A1LU)"
+  BRD_DLRAM_streamit=0x0C000000
+  BRD_UBOOT_streamit=0x18000000
+    BRD_DTB_streamit=0x180C0000
+ BRD_KERNEL_streamit=0x18200000
+ BRD_ROOTFS_streamit=0x18800000
+   BRD_QSPI_streamit=SINGLE
 
