@@ -6,6 +6,7 @@ The following kernel configurations are needed.
 	CONFIG_SND=y
 	CONFIG_SND_SOC=y
 	CONFIG_SND_SCUX_RSKRZA1=y
+	CONFIG_RZA_DMA=y
 
 
 The following Buildroot packages were used for testing:
@@ -87,4 +88,40 @@ When changing the resistors use to the MIC input instead of LINE IN
 # PAENR: Set from 0x0 (Microphones disabled) -> 0x4 (20dB)
 i2cset -f -y 3 0x10 0x15 0x40
 i2cset -f -y 3 0x10 0x16 0x40
+
+
+-----------------------------
+Configurations for Stream it!
+-----------------------------
+
+On the Stream it! board, the Headphones (HPR/HPL) output on the audio codec chip are used instead of LINE OUT.
+So, this change was needed in both the driver and the external aduio code chip. Below you will see the i2c commands that make this change in the codec chip.
+
+
+Also on On Stream it! board, the MIC input is used instead of LINE IN. This this also needed to be set in the codec chip using the i2c commands below.
+
+
+Before playing or recording audio, you must first enter the command below in order to configure the Linux sound system and the external audio codec chip.
+
+
+echo "Audio setup"
+amixer set 'Right Input Mixer MICR' on
+amixer set 'Left Input Mixer MICL' on
+amixer set 'Left Input Mixer LINEIN1' off
+amixer set 'Right Input Mixer LINEIN2' off
+amixer set 'Digital Audio Input' 60%
+
+echo "Audio codec Setup"
+# Audio Input Control Registers 'MICL Gain'(0x15) and 'MICL Gain'(0x16)
+# Left/Right Microphone Preamplifier Enable
+# PAENL: Set from 0x0 (Microphones disabled) -> 0x4 (20dB)
+# PAENR: Set from 0x0 (Microphones disabled) -> 0x4 (20dB)
+i2cset -f -y 1 0x10 0x15 0x40
+i2cset -f -y 1 0x10 0x16 0x40
+
+# Audio Output Control Registers (0x1a)
+# Headphone Output Mode Enable
+# HPMODE: Set from 0x0 (Shutdown mode) -> 0x03 (Stereo mode)
+i2cset -f -y 1 0x10 0x1a 0x03
+
 
