@@ -45,11 +45,12 @@ function banner_green {
 
 ##### Check for required Host packages #####
 MISSING_A_PACKAGE=0
-PACAKGE_LIST=(git make gcc g++ python)
+PACAKGE_LIST=(git make gcc g++ python bison flex)
 
-for i in 0 1 2 3 4; do
+for i in 0 1 2 3 4 5 6; do
   CHECK=$(which ${PACAKGE_LIST[$i]})
   if [ "$CHECK" == "" ] ; then
+    echo "ERROR: Missing host package: ${PACAKGE_LIST[$i]}"
     MISSING_A_PACKAGE=1
   fi
 done
@@ -68,10 +69,12 @@ if [ "$MISSING_A_PACKAGE" != "0" ] ; then
   echo "    g++"
   echo "    libncurses5-dev libncursesw5-dev"
   echo "    python"
+  echo "    bison"
+  echo "    flex"
   echo ""
   echo "The following command line will ensure all packages are installed."
   echo ""
-  echo "   sudo apt-get install git make gcc g++ libncurses5-dev libncursesw5-dev python"
+  echo "   sudo apt-get install git make gcc g++ libncurses5-dev libncursesw5-dev python bison flex"
   echo ""
   exit 1
 fi
@@ -148,7 +151,7 @@ function change_config {
 # Save current directory
 ROOTDIR=`pwd`
 
-#Defaults (for RSK)
+#Defaults (for RZ/A1 RSK)
 BOARD=rskrza1
 DLRAM_ADDR=0x08000000
 UBOOT_ADDR=0x18000000
@@ -553,8 +556,8 @@ Examples: (Download directory to QSPI Flash)
 
   # clear our log
   echo "" > /tmp/jlink.log
-
-  # keep a copy of the output in a log file to check if the operation was successful or not
+  # keep a copy of the output (using 'tee') in a log file to check if the operation
+  # was successful or not because jlink does not return an error code
   if [ "$4" == "dual" ] ; then
     JLinkExe -speed 15000 -if JTAG $JTAGCONF -device R7S721001_DualSPI -CommanderScript /tmp/jlink_load.txt | tee /tmp/jlink.log
   else
@@ -746,14 +749,6 @@ if [ "$1" == "kernel" ] || [ "$1" == "k" ] ; then
 
   cd linux-4.14
 
-  # Patch kernel
-  if [ ! -e arch/arm/configs/rskrza1_defconfig ] ;then
-    # Combine all the patches, then patch at once
-    cat $ROOTDIR/patches-kernel/* > /tmp/kernel_patches.patch
-    patch -p1 -i /tmp/kernel_patches.patch
-
-  fi
-
   # Do the build operation
   IMG_BUILD=0
   XIPCHECK=`grep -s CONFIG_XIP_KERNEL=y .config`
@@ -917,11 +912,17 @@ if [ "$1" == "buildroot" ]  || [ "$1" == "b" ] ; then
 
   if [ ! -e br_version.txt ] ; then
     echo "What version of Buildroot do you want to use?"
-    echo "1. buildroot-2017.02 (Long Term Support)"
+    echo "1. Buildroot-2017.02.10 (EOL)"
+    echo "2. Buildroot-2018.02.12 (EOL)"
+    echo "3. Buildroot-2019.02.x  (updates until March 2020)"
     echo -n "(select number)=> "
     read ANSWER
     if [ "$ANSWER" == "1" ] ; then
       echo "export BR_VERSION=2017.02" > br_version.txt
+    elif [ "$ANSWER" == "2" ] ; then
+      echo "export BR_VERSION=2018.02" > br_version.txt
+    elif [ "$ANSWER" == "3" ] ; then
+      echo "export BR_VERSION=2019.02" > br_version.txt
     else
       echo "ERROR: \"$ANSWER\" is an invalid selection!"
       exit 128
@@ -932,17 +933,28 @@ if [ "$1" == "buildroot" ]  || [ "$1" == "b" ] ; then
   # Download buildroot-$BR_VERSION.tar.bz2
   if [ ! -e buildroot-$BR_VERSION.tar.bz2 ] ;then
     wget http://buildroot.uclibc.org/downloads/buildroot-$BR_VERSION.tar.bz2
+    if [ "$?" != "0" ] ; then
+      exit 128 # could not download
+    fi
   fi
 
   # extract buildroot-$BR_VERSION
   if [ ! -e buildroot-$BR_VERSION/README ] ;then
     echo "extracting buildroot..."
     tar -xf buildroot-$BR_VERSION.tar.bz2
+    if [ "$?" != "0" ] ; then
+      exit 128 # could not extract
+    fi
+  fi
+
+  if [ ! -e buildroot-$BR_VERSION ] ;then
+      # something went wrong
+      exit 128
   fi
 
   cd buildroot-$BR_VERSION
 
-  # If it's an LTS version, apply any update patches
+  # If it's an LTS version, apply any update patches first (old way of doing it)
   if [ "$BR_VERSION" == "2017.02" ] ; then
 
     CHECK=`grep " BR2_VERSION " Makefile`
@@ -977,6 +989,10 @@ if [ "$1" == "buildroot" ]  || [ "$1" == "b" ] ; then
   fi
 
   # Apply Renesas Buildroot patches that have not been applied yet.
+  # Buildroot LTS update patches were made doing this in the Buildroot mainline repoistory:
+  #   git diff 2018.02   2018.02.1 > br_2018.02.0_to_2018.02.1.patch
+  #   git diff 2018.02.1 2018.02.2 > br_2018.02.1_to_2018.02.2.patch
+  #   git diff 2018.02.2 2018.02.3 > br_2018.02.2_to_2018.02.3.patch
   if [ ! -e .applied_renesas_patches ] ; then
     echo "# These patches have already been applied" > .applied_renesas_patches
   fi
@@ -1001,7 +1017,7 @@ if [ "$1" == "buildroot" ]  || [ "$1" == "b" ] ; then
   fi
 
  # Patch and Configure Buildroot for RZ/A
-  if [ ! -e configs/rza1_defconfig ]; then
+  if [ ! -e configs/rza1_defconfig ] &&  [ ! -e configs/rza_defconfig ]; then
 
     # Ask the user if they want to use the glib based Linaro toolchain
     # or build a uclib toolchain from scratch.
@@ -1038,16 +1054,16 @@ if [ "$1" == "buildroot" ]  || [ "$1" == "b" ] ; then
 
     # Copy in our default Buildroot config for the RSK
     # NOTE: It was made by running this inside buildroot
-    #   make savedefconfig BR2_DEFCONFIG=../../patches-buildroot/rza1_defconfig
+    #   make savedefconfig BR2_DEFCONFIG=../../patches-buildroot/rza_defconfig
     # or rather
-    #   ./build.sh buildroot savedefconfig BR2_DEFCONFIG=../../patches-buildroot/rza1_defconfig
+    #   ./build.sh buildroot savedefconfig BR2_DEFCONFIG=../../patches-buildroot/rza_defconfig
     #          NOTE: 'BR2_PACKAGE_JPEG=y' has to be manually added before
     #                'BR2_PACKAGE_JPEG_TURBO=y' (a bug in savedefconfig I assume)
     #
     cp -a $ROOTDIR/patches-buildroot/buildroot-$BR_VERSION/*_defconfig configs/
 
     # Just build the minimum file systerm. Users can go back and add more if they want to later.
-    make rza1_defconfig
+    make rza_defconfig
 
     if [ "$TC_CHOICE" == "2" ] ; then
 
