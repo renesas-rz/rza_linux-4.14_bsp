@@ -1,4 +1,4 @@
-Below are the configuraiton symbols and  menuconfig locations for each kernel driver.
+Below are the configuration symbols and menuconfig locations for each kernel driver.
 
 ---------------------------------------------------
 Searching
@@ -118,7 +118,7 @@ SH_TIMER_MTU2
 
 SPIBSC (QSPI)
 ---------------------------------------------------
-SPI_SH_SPIBSC
+SPI_SPIBSC
 > Device Drivers
 	> SPI support
 		[*] Renesas SPIBSC controller for RZA1
